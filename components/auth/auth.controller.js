@@ -7,7 +7,8 @@ exports.login = async (req, res) => {
 		const access_token = data.access_token;
 		client.set('access_token', access_token);
 
-		res.send(data.user);
+		const { role, chapter_finish, ...response } = data.user
+		res.send(response);
 	} catch (error) {
 		error?.response?.status
 			? res.status(error?.response?.status).send(error.message)
