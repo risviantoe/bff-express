@@ -1,5 +1,7 @@
 const api = require("../../lib/axios");
 const client = require("../../lib/redis");
+const util = require("util");
+const get = util.promisify(client.get).bind(client);
 
 exports.login = async (req, res) => {
     try {
@@ -14,6 +16,7 @@ exports.login = async (req, res) => {
         client.set("user", JSON.stringify(user));
 
         const { role, chapter_finish, ...response } = data.user;
+        response["role_id"] = data.user.role.id;
 
         res.status(200).send({
             status: 200,
@@ -29,8 +32,12 @@ exports.login = async (req, res) => {
 
 exports.user = async (req, res) => {
     try {
-		const data = await api.get("/user");
-		console.log(data);
+        const token = await client.get("access_token");
+        const { data } = await api.get("/user", {
+            headers: {
+                Authorization: `Bearer ${token}`,
+            },
+        });
 
         res.status(200).send({
             status: 200,
@@ -52,6 +59,7 @@ exports.user = async (req, res) => {
 
 exports.logout = async (req, res) => {
     const deleteToken = await client.del("access_token");
+    client.expire("access_token", 0);
     if (deleteToken === 0) {
         res.status(400).send({
             status: 400,
@@ -66,12 +74,16 @@ exports.logout = async (req, res) => {
     });
 };
 
-exports.token = (req, res) => {
-	async function getToken() {
-		const token = await client.get("access_token");
-		return await token;
-	}
-
-	const token = getToken()
-	console.log(token);
-}
+exports.refresh = async (req, res) => {
+    try {
+        const token = await client.get("access_token");
+        const { data } = await api.post("/auth/refresh", {
+            headers: {
+                Authorization: `Bearer ${token}`,
+            },
+        });
+        res.send(data)
+    } catch (error) {
+        res.send(error);
+    }
+};
